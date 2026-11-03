@@ -30,7 +30,7 @@ const loginLimiter = createLoginLimiter();
 const refreshLimiter = createRefreshLimiter();
 const oauthExchangeLimiter = createOAuthExchangeLimiter();
 
-router.use(['/login', '/register'], authLimiter);
+router.use(['/login', '/register', '/forgot-password', '/reset-password'], authLimiter);
 router.use('/login', loginLimiter);
 router.use('/refresh', refreshLimiter);
 router.use('/oauth/exchange', oauthExchangeLimiter);
@@ -394,6 +394,54 @@ router.put('/me', protect, [
   } catch (error) {
     console.error('Update profile error:', error);
     res.status(500).json({ message: 'Server error updating profile' });
+  }
+});
+
+// POST /api/auth/forgot-password
+router.post('/forgot-password', [
+  body('email').isEmail().normalizeEmail().withMessage('Please provide a valid email'),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ message: 'Validation failed', errors: errors.array() });
+    }
+
+    const { requestPasswordReset } = require('../services/passwordResetService');
+    await requestPasswordReset(req.body.email);
+
+    // Always same response — do not reveal whether email exists
+    res.json({
+      message: 'If an account with that email exists, a password reset link has been sent.',
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// POST /api/auth/reset-password
+router.post('/reset-password', [
+  body('token').trim().notEmpty().withMessage('Reset token is required'),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long'),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ message: 'Validation failed', errors: errors.array() });
+    }
+
+    const { resetPasswordWithToken } = require('../services/passwordResetService');
+    const result = await resetPasswordWithToken(req.body.token, req.body.password);
+
+    if (!result.ok) {
+      return res.status(400).json({ message: result.error });
+    }
+
+    res.json({ message: 'Password updated successfully. You can sign in now.' });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

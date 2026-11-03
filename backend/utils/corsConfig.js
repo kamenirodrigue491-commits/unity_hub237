@@ -1,60 +1,46 @@
-/**
- * CORS allowed origins for frontend (Vercel) ↔ API (Railway).
- */
-function parseOriginList(value) {
-  if (!value) return [];
-  return value
-    .split(',')
-    .map((s) => s.trim().replace(/\/+$/, ''))
-    .filter(Boolean);
-}
+const DEFAULT_ORIGINS = [
+  'https://unityhub1.vercel.app',
+  'http://localhost:3000',
+  'http://localhost:5173',
+];
 
-function getAllowedOrigins() {
+const normalize = (url) => (url || '').trim().replace(/\/+$/, '');
+
+const getAllowedOrigins = () => {
   const fromEnv = [
-    ...parseOriginList(process.env.FRONTEND_URLS),
-    ...parseOriginList(process.env.FRONTEND_URL),
-  ];
+    process.env.FRONTEND_URL,
+    ...(process.env.FRONTEND_URLS || '').split(','),
+  ]
+    .map(normalize)
+    .filter(Boolean);
 
-  if (!fromEnv.length) {
-    fromEnv.push('http://localhost:3000', 'http://localhost:3001');
-  }
+  return [...new Set([...DEFAULT_ORIGINS, ...fromEnv])];
+};
 
-  fromEnv.push('http://127.0.0.1:3000', 'http://127.0.0.1:3001');
-
-  return [...new Set(fromEnv)];
-}
-
-function isOriginAllowed(origin) {
-  if (!origin) return true;
-
+const createCorsOptions = () => {
   const allowed = getAllowedOrigins();
-  if (allowed.includes(origin)) return true;
 
-  // Vercel preview URLs: https://unityhub1-xxx.vercel.app
-  if (process.env.NODE_ENV === 'production') {
-    const primary = process.env.FRONTEND_URL || allowed.find((o) => o.includes('vercel.app')) || '';
-    if (primary.includes('vercel.app') && /^https:\/\/[\w.-]+\.vercel\.app$/i.test(origin)) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-function createCorsOptions() {
   return {
-    origin(origin, callback) {
-      if (isOriginAllowed(origin)) {
-        callback(null, true);
-      } else {
-        console.warn(`[CORS] Blocked origin: ${origin}. Set FRONTEND_URLS on Railway.`);
-        callback(new Error(`Origin ${origin} not allowed by CORS`));
-      }
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  };
-}
+    origin: (origin, callback) => {
+      // Allow non-browser tools (curl, Thunder Client, server-to-server)
+      if (!origin) return callback(null, true);
 
-module.exports = { getAllowedOrigins, isOriginAllowed, createCorsOptions };
+      const clean = normalize(origin);
+      const isVercelPreview = /^https:\/\/unityhub1[a-z0-9-]*\.vercel\.app$/.test(clean);
+
+      if (allowed.includes(clean) || isVercelPreview) {
+        return callback(null, true);
+      }
+
+      console.warn('[CORS] Blocked origin:', origin);
+      // Return false instead of throwing, so the error handler doesn't send a 500
+      return callback(null, false);
+    },
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    credentials: true,
+    optionsSuccessStatus: 204,
+  };
+};
+
+module.exports = { createCorsOptions, getAllowedOrigins };

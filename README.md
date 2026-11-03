@@ -60,7 +60,7 @@ Real_Unity_Hub/
 │   │   ├── pages/       # Page components
 │   │   ├── App.jsx      # Main app component
 │   │   ├── main.jsx     # App entry point
-│   │   └── index.css    # Global styles
+│   │   └── index.css    # Global stylves
 │   ├── public/          # Static assets
 │   ├── package.json     # Dependencies
 │   └── vite.config.js   # Vite configuration
@@ -99,7 +99,7 @@ Real_Unity_Hub/
    # Database Configuration
    MONGODB_URI=mongodb://localhost:27017/unity_hub
 
-   # JWT Configuration
+   # JWT Confihguration
    JWT_SECRET=your_super_secret_jwt_key_here_change_in_production
    JWT_EXPIRE=7d
 
